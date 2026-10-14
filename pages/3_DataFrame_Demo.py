@@ -1,22 +1,24 @@
-import streamlit as st
-import pandas as pd
-import altair as alt
 from urllib.error import URLError
 
-st.set_page_config(page_title="DataFrame Demo", page_icon="📊")
+import altair as alt
+import pandas as pd
+import streamlit as st
 
-st.markdown("# DataFrame Demo")
+import neon_theme as nt
+
+st.set_page_config(page_title="HYPERDECK | DataFrame Demo", page_icon="📊", layout="wide")
+nt.apply("DataFrame Demo", "DataFrame Demo",
+         "This demo shows how to use st.write to visualize Pandas DataFrames. "
+         "(Data courtesy of the UN Data Explorer.)")
 st.sidebar.header("DataFrame Demo")
-st.write(
-    """This demo shows how to use `st.write` to visualize Pandas DataFrames.
-(Data courtesy of the [UN Data Explorer](http://data.un.org/Explorer.aspx).)"""
-)
+
 
 @st.cache_data
 def get_UN_data():
     AWS_BUCKET_URL = "http://streamlit-demo-data.s3-us-west-2.amazonaws.com"
     df = pd.read_csv(AWS_BUCKET_URL + "/agri.csv.gz")
     return df.set_index("Region")
+
 
 try:
     df = get_UN_data()
@@ -34,16 +36,20 @@ try:
         data = pd.melt(data, id_vars=["index"]).rename(
             columns={"index": "year", "value": "Gross Agricultural Product ($B)"}
         )
-        chart = (
+        palette = [nt.CYAN, nt.PINK, nt.LIME, nt.AMBER, nt.VIOLET, "#7FDBFF", "#FF85C0"]
+        area = (
             alt.Chart(data)
-            .mark_area(opacity=0.3)
+            .mark_area(opacity=0.28, line={"strokeWidth": 2.5})
             .encode(
-                x="year:T",
+                x=alt.X("year:T", title="year"),
                 y=alt.Y("Gross Agricultural Product ($B):Q", stack=None),
-                color="Region:N",
+                color=alt.Color("Region:N", scale=alt.Scale(range=palette),
+                                legend=alt.Legend(orient="top")),
+                tooltip=["Region:N", alt.Tooltip("year:T", format="%Y"),
+                         alt.Tooltip("Gross Agricultural Product ($B):Q", format=",.1f")],
             )
         )
-        st.altair_chart(chart, width="stretch")
+        st.altair_chart(nt.neon_chart(area.properties(height=420)), width="stretch")
 except URLError as e:
     st.error(
         """
@@ -52,3 +58,5 @@ except URLError as e:
     """
         % e.reason
     )
+
+nt.footer()
