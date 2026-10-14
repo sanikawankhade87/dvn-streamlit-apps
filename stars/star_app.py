@@ -13,29 +13,105 @@
 import math
 
 import altair as alt
+import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 import streamlit as st
 
 SUN_T = 5772.0
 
-st.set_page_config(page_title="AppStar", layout="wide")
+st.set_page_config(page_title="STELLARIS | AppStar", page_icon="⭐", layout="wide")
 
+# ---- space theme: twinkling starfield, nebula glow, glass panels -------
 st.markdown("""<style>
-.stApp {background-color: #000000;}
-.stApp, .stApp p, .stApp label {color: #e8e8e8;}
-.block-container {padding-top: 0.4rem; padding-bottom: 0.3rem;
-                  max-width: 1000px;}
-header[data-testid="stHeader"] {display: none;}
-h1, h2, h3 {padding-top: 0 !important; margin: 0 0 0.2rem !important;
-            color: #f0f0f0;}
-form.vega-bindings {display: flex; justify-content: center;
-                    gap: 3rem; margin-top: 0.6rem;
-                    color: #e8e8e8; font-weight: 700;}
-form.vega-bindings input[type="range"] {width: 240px;}
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Inter:wght@400;600&display=swap');
+.stApp {
+  background:
+    radial-gradient(900px 500px at 15% 10%, rgba(120,60,255,.25), transparent 60%),
+    radial-gradient(800px 500px at 90% 30%, rgba(255,90,170,.16), transparent 60%),
+    radial-gradient(700px 400px at 50% 110%, rgba(0,200,255,.14), transparent 60%),
+    #02010a;
+  color: #e8e8ff; font-family: 'Inter', sans-serif;
+}
+.stApp::before, .stApp::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, #fff, transparent),
+    radial-gradient(1px 1px at 120px 80px, #cde, transparent),
+    radial-gradient(1.5px 1.5px at 200px 160px, #fff, transparent),
+    radial-gradient(1px 1px at 300px 40px, #fde, transparent),
+    radial-gradient(1px 1px at 380px 190px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 60px 220px, #ccf, transparent);
+  background-size: 420px 260px; animation: twinkle 5s ease-in-out infinite alternate;
+}
+.stApp::after { background-size: 610px 370px; animation-delay: 2.5s; opacity: .7; }
+@keyframes twinkle { from { opacity: .35; } to { opacity: 1; } }
+header[data-testid="stHeader"] {background: transparent;}
+.block-container {padding-top: 1rem; max-width: 1100px; position: relative; z-index: 1;}
+h1, h2, h3 {font-family: 'Orbitron', sans-serif !important; color: #f0f0ff;}
+.nav {display:flex; align-items:center; justify-content:space-between; padding: 14px 22px;
+  border-radius: 18px; margin-bottom: 14px; background: rgba(15,10,40,.55);
+  backdrop-filter: blur(8px); border: 1px solid rgba(150,120,255,.45);
+  box-shadow: 0 0 24px rgba(130,90,255,.35), inset 0 0 20px rgba(255,90,170,.12);}
+.brand {display:flex; align-items:center; gap: 14px;}
+.brand-name {font-family:'Orbitron'; font-weight:900; font-size: 28px; letter-spacing:.2em;
+  background: linear-gradient(90deg, #ffd27d, #ff7ac6, #8fd3ff); -webkit-background-clip:text;
+  color: transparent; filter: drop-shadow(0 0 10px rgba(255,200,120,.5));}
+.brand-sub {font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: #a9a6d8;}
+.logo {animation: pulse 3s ease-in-out infinite;}
+@keyframes pulse {0%,100% {filter: drop-shadow(0 0 6px #ffd27d);} 50% {filter: drop-shadow(0 0 18px #ff9a3c);}}
+.orbit {transform-origin: 32px 32px; animation: spin 8s linear infinite;}
+@keyframes spin {to {transform: rotate(360deg);}}
+.hero {text-align:center; margin: 4px 0 14px;}
+.hero h1 {font-size: 40px; margin: 0; background: linear-gradient(90deg, #fff, #ffd27d 45%, #ff7ac6);
+  -webkit-background-clip: text; color: transparent;}
+.hero p {color: #c9c6f0; margin-top: 8px;}
+.cards {display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 8px 0 12px; perspective: 900px;}
+.card {padding: 14px 18px; border-radius: 16px; background: rgba(15,10,40,.65);
+  border: 1px solid rgba(150,120,255,.45); transition: transform .3s ease, box-shadow .3s ease;
+  box-shadow: 0 0 16px rgba(130,90,255,.25);}
+.card:hover {transform: rotateX(8deg) rotateY(-8deg) translateZ(14px);
+  box-shadow: 0 0 28px rgba(255,200,120,.55); border-color: #ffd27d;}
+.card .lab {font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: #a9a6d8;}
+.card .val {font-family:'Orbitron'; font-size: 24px; font-weight: 900; margin-top: 4px;}
+form.vega-bindings {display: flex; justify-content: center; gap: 3rem; margin-top: 0.8rem;
+  color: #ffe2b0; font-weight: 700; font-family: 'Orbitron', sans-serif; font-size: 13px;}
+form.vega-bindings input[type="range"] {width: 260px; accent-color: #ff7ac6;}
+.orb-wrap {position: relative; width: 120px; height: 120px; margin: 6px auto 4px; perspective: 700px;}
+.orb {position: absolute; inset: 0; transform-style: preserve-3d;
+  animation: tilt 14s linear infinite;}
+.orb-wrap .core {position:absolute; inset: 28px; border-radius: 50%; z-index: 2;
+  background: radial-gradient(circle at 35% 30%, #fffbe8, #ffd27d 40%, #ff8a3c 70%, #b8341b);
+  box-shadow: 0 0 40px #ffb347, 0 0 90px rgba(255,140,60,.6);}
+.orb .ring {position:absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(143,211,255,.7);
+  box-shadow: 0 0 12px rgba(143,211,255,.6);}
+.orb .r1 {transform: rotateX(72deg);} .orb .r2 {transform: rotateY(72deg) rotateX(20deg); border-color: rgba(255,122,198,.7);}
+.orb .r3 {transform: rotateX(72deg) rotateY(60deg); border-color: rgba(255,210,125,.6);}
+@keyframes tilt {from {transform: rotateY(0deg) rotateX(12deg);} to {transform: rotateY(360deg) rotateX(12deg);}}
+[data-testid="stPlotlyChart"] {border-radius: 20px; overflow: hidden; border: 1px solid rgba(150,120,255,.35);
+  box-shadow: 0 0 30px rgba(120,80,255,.3);}
+.foot {text-align:center; color:#7f7bb0; font-size: 12px; margin-top: 18px;}
+@media (max-width: 800px) {.cards {grid-template-columns: 1fr;} .hero h1 {font-size: 28px;}}
 </style>""", unsafe_allow_html=True)
 
-st.markdown("### AppStar")
+st.markdown("""
+<div class="nav"><div class="brand">
+  <svg class="logo" width="48" height="48" viewBox="0 0 64 64">
+    <defs><radialGradient id="sun"><stop offset="0" stop-color="#fff6d8"/>
+      <stop offset=".55" stop-color="#ffd27d"/><stop offset="1" stop-color="#ff7a3c"/></radialGradient></defs>
+    <circle cx="32" cy="32" r="11" fill="url(#sun)"/>
+    <g class="orbit"><ellipse cx="32" cy="32" rx="27" ry="10" fill="none" stroke="#8fd3ff"
+       stroke-width="1.6" stroke-dasharray="4 4" transform="rotate(-25 32 32)"/>
+      <circle cx="57" cy="22" r="3.5" fill="#ff7ac6"/></g>
+  </svg>
+  <div><div class="brand-name">STELLARIS</div>
+  <div class="brand-sub">AppStar · life and death of a star</div></div></div>
+</div>
+<div class="orb-wrap"><div class="orb"><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div><div class="core"></div></div>
+<div class="hero"><h1>Build a star. Watch it live and die.</h1>
+<p>Drag <b>mass</b> and <b>age</b> under the charts. The portrait, the HR diagram and the
+phase plane all follow your star. Change <b>metallicity</b> to rewrite its fate.</p></div>
+""", unsafe_allow_html=True)
 
 alt.data_transformers.disable_max_rows()
 
@@ -44,10 +120,16 @@ alt.data_transformers.disable_max_rows()
 lz = st.slider("log10 metallicity", -4.0, -1.4, -1.7, step=0.05)
 Z = 10 ** lz
 zr = Z / 0.02
-st.caption(f"Metallicity Z = {Z:.4f} ({zr:.2g} x the Sun). "
-           f"Black holes form above {18 + 7 * zr:.1f} suns"
-           + ("; pair-instability window open (140-260 suns leave no remnant)."
-              if Z < 0.001 else "."))
+pi_open = Z < 0.001
+st.markdown(f"""<div class="cards">
+  <div class="card"><div class="lab">Metallicity Z</div>
+    <div class="val" style="color:#8fd3ff">{Z:.4f}</div>{zr:.2g} x the Sun</div>
+  <div class="card"><div class="lab">Black holes form above</div>
+    <div class="val" style="color:#ff7ac6">{18 + 7 * zr:.1f} suns</div>neutron stars below this mass</div>
+  <div class="card"><div class="lab">Pair-instability window</div>
+    <div class="val" style="color:{'#ffd27d' if pi_open else '#7f7bb0'}">{'OPEN' if pi_open else 'closed'}</div>
+    {'140-260 suns explode with no remnant' if pi_open else 'opens below Z = 0.001'}</div>
+</div>""", unsafe_allow_html=True)
 
 
 def bb_rgb(T):
@@ -204,8 +286,19 @@ def readout(field, y_px, size=12, color="#9aa1a8", bold=False):
         x=alt.value(CX), y=alt.value(y_px), text=field)
 
 
+def halo(factor, opacity):
+    # soft glow rings in the star's own colour
+    return alt.Chart(grid).transform_filter(
+        pick + ' && datum.phase != "black hole" && datum.phase != "no remnant"'
+    ).transform_calculate(halo_size=f"datum.size * {factor}").mark_circle(
+        opacity=opacity).encode(
+        x=alt.value(CX), y=alt.value(CY),
+        size=alt.Size("halo_size:Q", scale=None, legend=None),
+        color=alt.Color("colour:N", scale=None, legend=None))
+
+
 portrait = alt.layer(
-    disc, bh_ring, sun_ring,
+    halo(4.5, 0.06), halo(2.6, 0.12), halo(1.6, 0.22), disc, bh_ring, sun_ring,
     readout("massage:N", 340),
     readout("phase:N", 364, size=15, color="#f5f2ea", bold=True),
     readout("temp:N", 386),
@@ -388,7 +481,47 @@ chart = alt.vconcat(
     alt.hconcat(portrait, hr),
     plane,
 ).add_params(
-    m_sel, a_sel).configure(background="#000000").configure_view(
-    fill="#000000", stroke=None)
+    m_sel, a_sel).configure(background="transparent").configure_view(
+    fill="transparent", stroke=None)
 
 st.altair_chart(chart, width="content")
+
+with st.expander("How to read this app"):
+    st.markdown("""
+- **Portrait (top left):** the star's colour comes from its surface temperature (black-body colour);
+  its size is drawn on a log scale. The gold ring is the Sun's size for comparison.
+- **HR diagram (top right):** hot stars on the left, bright stars at the top. The grey band is the
+  main sequence; giants move up and right, white dwarfs drop down and left.
+- **Phase plane (bottom):** every mass and age, coloured by what the star is at that moment.
+- **Metallicity:** metal-poor stars are slightly brighter, and below Z = 0.001 the most massive stars
+  (140-260 suns) blow themselves apart and leave no remnant.
+""")
+# ---- 3D: every star in the model, in mass-age-luminosity space ---------
+st.markdown("### 3D stellar landscape")
+st.caption("Every mass and age in the model, lifted to its luminosity and painted in its own "
+           "black-body colour. Drag to rotate, scroll to zoom, hover a point for its phase. "
+           "The main sequence is the bright sloping shelf; giants rise above it before the "
+           "stars fall to white dwarfs. Neutron stars, black holes and supernovae have no "
+           "plotted luminosity, so they leave the landscape.")
+land = grid.dropna(subset=["lum", "temp_K"])
+fig3d = go.Figure(go.Scatter3d(
+    x=land["lm"], y=land["la"], z=np.log10(land["lum"]),
+    mode="markers",
+    marker=dict(size=2.6, color=land["colour"], opacity=0.85),
+    text=[f"{ph}<br>{ma}<br>{t}" for ph, ma, t in zip(land["phase"], land["massage"], land["temp"])],
+    hoverinfo="text"))
+axis = dict(gridcolor="rgba(150,120,255,.25)", backgroundcolor="rgba(0,0,0,0)",
+            color="#c9c6f0", showbackground=True, zerolinecolor="rgba(150,120,255,.4)")
+fig3d.update_layout(
+    height=620, paper_bgcolor="rgba(5,3,20,0.6)", margin=dict(l=0, r=0, t=10, b=0),
+    scene=dict(xaxis=dict(title="log10 mass (suns)", **axis),
+               yaxis=dict(title="log10 age (Gyr)", **axis),
+               zaxis=dict(title="log10 luminosity (suns)", **axis),
+               camera=dict(eye=dict(x=1.6, y=-1.5, z=0.9)), aspectmode="manual",
+               aspectratio=dict(x=1.2, y=1.2, z=0.8)),
+    font=dict(color="#e8e8ff"))
+st.plotly_chart(fig3d, theme=None, width="stretch")
+
+st.markdown('<div class="foot">STELLARIS · built on the 36104 AppStar starter · '
+            'Streamlit + Altair (Vega-Lite parameters keep mass and age live in the browser)</div>',
+            unsafe_allow_html=True)
