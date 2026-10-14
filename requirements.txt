@@ -3,3 +3,4 @@ pandas
 numpy
 altair>=5
 pydeck
+plotly
